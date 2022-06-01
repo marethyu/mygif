@@ -61,7 +61,7 @@ public:
     size_t height;
     int left;
     int top;
-    bool interlace; // TODO
+    bool interlace;
 
     std::vector<Color> ct;
     std::vector<int> index;
@@ -177,7 +177,7 @@ inline uint32_t color_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 
 int main()
 {
-    std::ifstream gif("hog-rider.gif");
+    std::ifstream gif("gifs/cat.gif"); // TODO gifs/okabe.gif
     std::vector<uint8_t> bytes;
 
     gif.seekg(0, gif.end);
@@ -610,7 +610,7 @@ int main()
 
     int i = 0; // index for blocks list
     bool loop = false;
-    int delay = 1000; // animation rate in milliseconds
+    int delay = 0; // animation rate in milliseconds
     int disposal = 2;
     bool doRender = false;
     int img_left = 0;
@@ -620,11 +620,11 @@ int main()
     bool transparent = false;
     uint8_t trans_idx = 0;
 
-    assert(gct_flag);
-    Color bkgd = gct[bkgd_color_idx];
+    Color bkgd = gct_flag ? gct[bkgd_color_idx] : Color{255, 255, 255};
     uint32_t bkgd_color = color_rgba(bkgd.r, bkgd.g, bkgd.b, 255);
 
-    std::vector<uint32_t> pixels(canvas_width * canvas_height, 0); // initialize with black
+    std::vector<uint32_t> pixels(canvas_width * canvas_height, bkgd_color);
+    std::vector<uint32_t> prev;
 
     SDL_Event event;
 
@@ -644,11 +644,39 @@ int main()
             img_width = img->width;
             img_height = img->height;
 
+            int row1[img_height];
+            int row2[img_height];
+
+            if (img->interlace)
+            {
+                for (int i = 0; i < img_height; ++i)
+                {
+                    row1[i] = i;
+                }
+
+                int j = 0;
+                for (int i = 0; i < img_height; i += 8, j++)  /* Interlace Pass 1 */
+                    row2[i] = row1[j];
+                for (int i = 4; i < img_height; i += 8, j++)  /* Interlace Pass 2 */
+                    row2[i] = row1[j];
+                for (int i = 2; i < img_height; i += 4, j++)  /* Interlace Pass 3 */
+                    row2[i] = row1[j];
+                for (int i = 1; i < img_height; i += 2, j++)  /* Interlace Pass 4 */
+                    row2[i] = row1[j];
+            }
+            else
+            {
+                for (int i = 0; i < img_height; ++i)
+                {
+                    row1[i] = row2[i] = i;
+                }
+            }
+
             for (int y = 0; y < img_height; ++y)
             {
                 for (int x = 0; x < img_width; ++x)
                 {
-                    int index = img->index[y * img_width + x];
+                    int index = img->index[row2[y] * img_width + x];
 
                     if ((transparent && index != trans_idx) || ! transparent)
                     {
@@ -736,12 +764,14 @@ int main()
         }
         case 3: // overwrite graphic with previous graphic
         {
-            // TODO
+            pixels = prev;
             break;
         }
         }
 
+        prev = pixels;
         doRender = false;
+
         SDL_Delay(delay);
     }
 
