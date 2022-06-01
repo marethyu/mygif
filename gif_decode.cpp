@@ -734,6 +734,11 @@ int main()
             }
             break;
         }
+        case 3: // overwrite graphic with previous graphic
+        {
+            // TODO
+            break;
+        }
         }
 
         doRender = false;
