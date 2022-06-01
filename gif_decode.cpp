@@ -175,9 +175,15 @@ inline uint32_t color_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
     return (a << 24) | (r << 16) | (g << 8) | b;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-    std::ifstream gif("gifs/cat.gif"); // TODO gifs/okabe.gif
+    if (argc <= 1)
+    {
+        std::cerr << "Usage: gif_decoder [FILE NAME].gif" << std::endl;
+        return 1;
+    }
+
+    std::ifstream gif(argv[1]);
     std::vector<uint8_t> bytes;
 
     gif.seekg(0, gif.end);
@@ -193,7 +199,7 @@ int main()
     /* Process header block - bytes 0 to 5 */
 
     bool bGIF89a = bytes[4] == 0x39;
-
+/*
     std::cerr << "HEADER BLOCK" << std::endl;
     std::cerr << bytes[0] << " - " << HexToString(bytes[0]) << std::endl; // G
     std::cerr << bytes[1] << " - " << HexToString(bytes[1]) << std::endl; // I
@@ -202,7 +208,7 @@ int main()
     std::cerr << bytes[4] << " - " << HexToString(bytes[4]) << std::endl; // 7 or 9
     std::cerr << bytes[5] << " - " << HexToString(bytes[5]) << std::endl; // a
     std::cerr << std::endl;
-
+*/
     assert(bGIF89a); /// support version 89a for now
 
     /* Process logical screen descriptor bytes 6 to 12 */
@@ -215,7 +221,7 @@ int main()
     bool gct_flag = get_bit(packed_field, 7); // most significant bit
     uint8_t N = get_val(packed_field, 4, 3); // color resolution
     int bkgd_color_idx = bytes[11];
-
+/*
     std::cerr << "LOGICAL SCREEN DESCRIPTOR" << std::endl;
     std::cerr << "Canvas width: " << canvas_width << std::endl;
     std::cerr << "Canvas height: " << canvas_height << std::endl;
@@ -223,7 +229,7 @@ int main()
     std::cerr << "Color resolution: " << int(N) << std::endl;
     std::cerr << "Background color index: " << bkgd_color_idx << std::endl;
     std::cerr << std::endl;
-
+*/
     int idx = 13;
 
     std::vector<Color> gct;
@@ -233,7 +239,7 @@ int main()
 
     if (gct_flag)
     {
-        std::cerr << "GLOBAL COLOR TABLE" << std::endl;
+        //std::cerr << "GLOBAL COLOR TABLE" << std::endl;
 
         for (int i = 0; i < ncolors; ++i)
         {
@@ -245,10 +251,10 @@ int main()
 
             gct.push_back(color);
 
-            std::cerr << "Red: " << int(gct[i].r) << ", Green: " << int(gct[i].g) << ", Blue: " << int(gct[i].b) << std::endl;
+            //std::cerr << "Red: " << int(gct[i].r) << ", Green: " << int(gct[i].g) << ", Blue: " << int(gct[i].b) << std::endl;
         }
 
-        std::cerr << std::endl;
+        //std::cerr << std::endl;
     }
 
     /* Process graphics control extension, application extension, comment extension, etc. until eof */
@@ -279,7 +285,7 @@ int main()
 
             bool lct_flag = get_bit(packed_field, 7); // most significant bit
             size_t lct_size = get_val(packed_field, 0, 3);
-
+/*
             std::cerr << "IMAGE DESCRIPTOR" << std::endl;
             std::cerr << "Left: " << i.left << std::endl;
             std::cerr << "Top: " << i.top << std::endl;
@@ -288,7 +294,7 @@ int main()
             std::cerr << "Interlaced: " << i.interlace << std::endl;
             std::cerr << "Local color table flag: " << lct_flag << std::endl;
             std::cerr << std::endl;
-
+*/
             /* Process local color table (optional) */
 
             if (lct_flag)
@@ -296,7 +302,7 @@ int main()
                 size_t ncolors = 1 << (lct_size + 1);
                 std::vector<Color> lct;
 
-                std::cerr << "LOCAL COLOR TABLE" << std::endl;
+                //std::cerr << "LOCAL COLOR TABLE" << std::endl;
 
                 for (int i = 0; i < ncolors; ++i)
                 {
@@ -308,10 +314,10 @@ int main()
 
                     lct.push_back(color);
 
-                    std::cerr << "Red: " << int(lct[i].r) << ", Green: " << int(lct[i].g) << ", Blue: " << int(lct[i].b) << std::endl;
+                    //std::cerr << "Red: " << int(lct[i].r) << ", Green: " << int(lct[i].g) << ", Blue: " << int(lct[i].b) << std::endl;
                 }
 
-                std::cerr << std::endl;
+                //std::cerr << std::endl;
 
                 i.ct = lct;
             }
@@ -393,9 +399,10 @@ int main()
 
                 if (table.find(code) == table.end())
                 {
-                    table[table_index] = table[prev];
-                    table[table_index].push_back(table[prev][0]); // {CODE-1}+k
-                    index_stream.insert(index_stream.end(), table[table_index].begin(), table[table_index].end());
+                    table[code] = table[prev];
+                    table[code].push_back(table[prev][0]); // {CODE-1}+k
+                    index_stream.insert(index_stream.end(), table[code].begin(), table[code].end());
+                    table_index = code;
                 }
                 else // code exists in the table
                 {
@@ -404,7 +411,7 @@ int main()
                     table[table_index].push_back(table[code][0]); // {CODE-1}+k
                 }
 
-                if (++table_index == (1 << code_size))
+                if (++table_index == (1 << code_size) && code_size < 12)
                 {
                     code_size++; // increase as soon as the index is equal to 2^(code_size)-1
                 }
@@ -455,7 +462,7 @@ int main()
                 idx++; // skip the terminator
 
                 blocks.push_back(std::make_unique<GraphicsControl>(gc));
-
+/*
                 std::cerr << "GRAPHIC CONTROL EXTENSION" << std::endl;
                 std::cerr << "Is transparent: " << gc.transparent << std::endl;
                 std::cerr << "User input enabled: " << gc.user_input << std::endl;
@@ -463,7 +470,7 @@ int main()
                 std::cerr << "Delay time: " << gc.delay_time << std::endl;
                 std::cerr << "Transparent color index: " << int(gc.color_index) << std::endl;
                 std::cerr << std::endl;
-
+*/
                 break;
             }
             case 0xFF: // Application extension
@@ -474,12 +481,12 @@ int main()
 
                 for (int i = 0; i < 8; ++i) ae.appid[i] = bytes[idx++]; // Application identifier
                 for (int i = 0; i < 3; ++i) ae.authcode[i] = bytes[idx++]; // Application auth code
-
+/*
                 std::cerr << "APPLICATION EXTENSION" << std::endl;
                 std::cerr << "App id: " << ae.appid << std::endl;
                 std::cerr << "App auth code: " << ae.authcode << std::endl;
                 std::cerr << std::endl;
-
+*/
                 while (true)
                 {
                     size_t nbytes = bytes[idx++]; // size of a data sub-block
@@ -511,17 +518,17 @@ int main()
                     for (int i = 0; i < nbytes; ++i, ++idx)
                         ;
                 }
-
+/*
                 std::cerr << "PLAIN TEXT EXTENSION" << std::endl;
                 std::cerr << std::endl;
-
+*/
                 break;
             }
             case 0xFE: // Comment extension
             {
                 CommentBlock cb;
 
-                std::cerr << "COMMENT EXTENSION" << std::endl;
+                //std::cerr << "COMMENT EXTENSION" << std::endl;
 
                 while (true)
                 {
@@ -536,9 +543,11 @@ int main()
                     }
 
                     cb.comments.push_back(comment);
+
+                    //std::cerr << comment << std::endl;
                 }
 
-                std::cerr << std::endl;
+                //std::cerr << std::endl;
 
                 blocks.push_back(std::make_unique<CommentBlock>(cb));
 
@@ -650,10 +659,7 @@ int main()
             if (img->interlace)
             {
                 for (int i = 0; i < img_height; ++i)
-                {
                     row1[i] = i;
-                }
-
                 int j = 0;
                 for (int i = 0; i < img_height; i += 8, j++)  /* Interlace Pass 1 */
                     row2[i] = row1[j];
@@ -667,9 +673,7 @@ int main()
             else
             {
                 for (int i = 0; i < img_height; ++i)
-                {
                     row1[i] = row2[i] = i;
-                }
             }
 
             for (int y = 0; y < img_height; ++y)
@@ -743,9 +747,6 @@ int main()
         switch (disposal)
         {
         case 0: // disposal method not specified
-        {
-            break;
-        }
         case 1: // do not dispose of graphic
         {
             break;
