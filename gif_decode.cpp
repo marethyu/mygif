@@ -11,7 +11,7 @@ Resources:
 to compile: g++ gif_decode.cpp -o gif_decode -std=c++14 -lSDL2
 
 TODO:
-- fix lzw: resulting index stream size is smaller than expected? try newton's cradle gif and rick roll gif
+- debug I80i4.gif
 - better data structure for lzw table
 - use a state machine for decoding process?
 */
@@ -146,7 +146,7 @@ std::unordered_map<int, std::vector<int>> init_table(int ncolors, int code_size,
 {
     std::unordered_map<int, std::vector<int>> table;
 
-    for (int i = 0; i < ncolors; ++i)
+    for (int i = 0; i < clear_code; ++i)
     {
         table[i] = std::vector<int>({i});
     }
@@ -225,6 +225,7 @@ int main(int argc, char *argv[])
 
     bool gct_flag = get_bit(packed_field, 7); // most significant bit
     uint8_t N = get_val(packed_field, 4, 3); // color resolution
+    size_t gct_size = get_val(packed_field, 0, 3);
     int bkgd_color_idx = bytes[11];
 /*
     std::cerr << "LOGICAL SCREEN DESCRIPTOR" << std::endl;
@@ -232,13 +233,14 @@ int main(int argc, char *argv[])
     std::cerr << "Canvas height: " << canvas_height << std::endl;
     std::cerr << "Global color table flag: " << gct_flag << std::endl;
     std::cerr << "Color resolution: " << int(N) << std::endl;
+    std::cerr << "Global color table size: " << gct_size << std::endl;
     std::cerr << "Background color index: " << bkgd_color_idx << std::endl;
     std::cerr << std::endl;
 */
     int idx = 13;
 
     std::vector<Color> gct;
-    size_t ncolors = 1 << (N + 1);
+    size_t ncolors = 1 << (gct_size + 1);
 
     /* Process global color table (optional) */
 
@@ -272,6 +274,7 @@ int main(int argc, char *argv[])
     while (!done)
     {
         uint8_t b = bytes[idx++];
+        //std::cerr << HexToString(b) << std::endl;
 
         switch (b)
         {
@@ -343,6 +346,7 @@ int main(int argc, char *argv[])
             while (true)
             {
                 size_t nbytes = bytes[idx++]; // size of a data sub-block
+                //std::cerr << "LZW data block size: " << nbytes << std::endl;
 
                 if (nbytes == 0)
                 {
@@ -402,31 +406,32 @@ int main(int argc, char *argv[])
                     break;
                 }
 
-                if (table.size() >= 4096)
-                {
-                    //continue; // till CC or EOI
-                }
+                int k = 0;
 
-                if (table.find(code) == table.end())
+                if (code >= table.size())
                 {
-                    table[code] = table[prev];
-                    table[code].push_back(table[prev][0]); // {CODE-1}+k
-                    index_stream.insert(index_stream.end(), table[code].begin(), table[code].end());
-                    table_index = code;
+                    k = table[prev][0];
+                    index_stream.insert(index_stream.end(), table[prev].begin(), table[prev].end());
+                    index_stream.push_back(k);
                 }
                 else // code exists in the table
                 {
                     index_stream.insert(index_stream.end(), table[code].begin(), table[code].end());
-                    table[table_index] = table[prev];
-                    table[table_index].push_back(table[code][0]); // {CODE-1}+k
+                    k = table[code][0];
                 }
 
-                if (table.size() == (1 << code_size) && code_size < 12)
+                if (table_index < 0x1000)
                 {
-                    code_size++; // increase as soon as the index is equal to 2^(code_size)-1
+                    table[table_index] = table[prev];
+                    table[table_index].push_back(k);
+                    table_index++;
+
+                    if (table.size() == (1 << code_size) && code_size < 12)
+                    {
+                        code_size++; // increase as soon as the index is equal to 2^(code_size)-1
+                    }
                 }
 
-                table_index++;
                 prev = code;
 
                 //std::cerr << "Step " << step << " result: index=" << DebugVector(index_stream) << std::endl;
