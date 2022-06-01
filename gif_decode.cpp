@@ -4,11 +4,16 @@ quick and dirty implementation of gif decoder
 Resources:
 - https://en.wikipedia.org/wiki/GIF
 - https://www.w3.org/Graphics/GIF/spec-gif89a.txt
-- http://giflib.sourceforge.net/whatsinagif/index.html
+- http://www.matthewflickinger.com/lab/whatsinagif/
 - http://www.daubnet.com/en/file-format-gif
 - https://www.cs.albany.edu/~sdc/csi333/Fal07/Lect/L18/Summary
 
 to compile: g++ gif_decode.cpp -o gif_decode -std=c++14 -lSDL2
+
+TODO:
+- fix lzw: resulting index stream size is smaller than expected? try newton's cradle gif and rick roll gif
+- better data structure for lzw table
+- use a state machine for decoding process?
 */
 
 #include <iostream>
@@ -369,7 +374,7 @@ int main(int argc, char *argv[])
             prev = code;
 
             int step = 1;
-            std::cerr << "LZW DECODING" << std::endl;
+            //std::cerr << "LZW DECODING" << std::endl;
 
             while (true)
             {
@@ -379,7 +384,7 @@ int main(int argc, char *argv[])
 
                 if (code == clear_code)
                 {
-                    std::cerr << "Reached CLEAR code" << std::endl;
+                    //std::cerr << "Reached CLEAR code" << std::endl;
 
                     code_size = first_code_size;
                     table = init_table(ncolors, code_size, clear_code, eoi_code);
@@ -393,8 +398,13 @@ int main(int argc, char *argv[])
                 }
                 else if (code == eoi_code)
                 {
-                    std::cerr << "Reached EOI code" << std::endl;
+                    //std::cerr << "Reached EOI code" << std::endl;
                     break;
+                }
+
+                if (table.size() >= 4096)
+                {
+                    //continue; // till CC or EOI
                 }
 
                 if (table.find(code) == table.end())
@@ -411,11 +421,12 @@ int main(int argc, char *argv[])
                     table[table_index].push_back(table[code][0]); // {CODE-1}+k
                 }
 
-                if (++table_index == (1 << code_size) && code_size < 12)
+                if (table.size() == (1 << code_size) && code_size < 12)
                 {
                     code_size++; // increase as soon as the index is equal to 2^(code_size)-1
                 }
 
+                table_index++;
                 prev = code;
 
                 //std::cerr << "Step " << step << " result: index=" << DebugVector(index_stream) << std::endl;
@@ -431,9 +442,10 @@ int main(int argc, char *argv[])
                 std::cerr << "#" << i << ": " << DebugVector(table[i]) << std::endl;
             }
 */
-            std::cerr << std::endl;
+            //std::cerr << std::endl;
 
             i.index = index_stream;
+            assert(i.index.size() == i.width * i.height);
             blocks.push_back(std::make_unique<Image>(i));
 
             break;
